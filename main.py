@@ -22,12 +22,29 @@ pygame.init()
 
 WIDTH, HEIGHT = 900, 600
 win = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("DFS Maze Visualization")
+pygame.display.set_caption("DFS Maze Virtualizer")
 
 DIFFICULTY = 0.3
 
-maze = generate_maze(DIFFICULTY)
-visited = reset_visited()
+class VirtualCell:
+    def __init__(self, is_wall):
+        self.is_wall = is_wall
+        self.visited = False
+
+class VirtualMaze:
+    def __init__(self, raw_grid):
+        self.grid = [[VirtualCell(cell == 0) for cell in row] for row in raw_grid]
+        self.rows = len(self.grid)
+        self.cols = len(self.grid[0])
+
+    def is_valid(self, x, y):
+        return 0 <= x < self.rows and 0 <= y < self.cols and not self.grid[x][y].is_wall and not self.grid[x][y].visited
+
+    def visit(self, x, y):
+        self.grid[x][y].visited = True
+
+maze_raw = generate_maze(DIFFICULTY)
+virtual_maze = VirtualMaze(maze_raw)
 exit_cell = get_exit_cell()
 final_path = []
 steps_taken = 0
@@ -42,12 +59,10 @@ search_finished = False
 def dfs(x, y, path):
     global found_exit, steps_taken, final_path, solve_time, search_finished
 
-    if found_exit or not (0 <= x < ROWS and 0 <= y < COLS):
-        return
-    if visited[x][y] or maze[x][y] == 0:
+    if found_exit or not virtual_maze.is_valid(x, y):
         return
 
-    visited[x][y] = True
+    virtual_maze.visit(x, y)
     path.append((x, y))
     steps_taken += 1
 
@@ -86,10 +101,10 @@ def dfs(x, y, path):
 
 def update_info_panel():
     font = pygame.font.SysFont(None, TILE_SIZE)
-    pygame.draw.rect(win, (0, 0, 0), (610, 10, 180, 100))
+    pygame.draw.rect(win, (0, 0, 0), (610, 10, 180, 130))
 
-    text = font.render("Steps: " + str(steps_taken), True, (255, 255, 255))
-    win.blit(text, (610, 50))
+    env_label = font.render("Mode: Virtual Maze", True, (100, 200, 255))
+    win.blit(env_label, (610, 10))
 
     difficulty_label = ""
     if DIFFICULTY == 0.2:
@@ -100,39 +115,41 @@ def update_info_panel():
         difficulty_label = "Hard"
 
     d_text = font.render("Difficulty: " + difficulty_label, True, (255, 255, 255))
-    win.blit(d_text, (610, 10))
+    win.blit(d_text, (610, 35))
+
+    text = font.render("Steps: " + str(steps_taken), True, (255, 255, 255))
+    win.blit(text, (610, 60))
 
     if search_finished and not found_exit:
         t_text = font.render("No path found", True, (255, 100, 100))
-        win.blit(t_text, (610, 80))
+        win.blit(t_text, (610, 90))
     elif started and not found_exit:
         t_text = font.render("Searching...", True, (255, 255, 0))
-        win.blit(t_text, (610, 80))
+        win.blit(t_text, (610, 90))
 
     if found_exit:
         t_text = font.render("Time: {:.2f}s".format(solve_time), True, (255, 255, 255))
-        win.blit(t_text, (610, 80))
+        win.blit(t_text, (610, 90))
 
-    pygame.display.update(pygame.Rect(610, 10, 180, 100))
+    pygame.display.update(pygame.Rect(610, 10, 180, 130))
 
 
 def reset():
-    global visited, final_path, steps_taken, found_exit, started, solve_time, search_finished
-    visited = reset_visited()
+    global virtual_maze, maze_raw, final_path, steps_taken, found_exit, started, solve_time, search_finished
+    maze_raw = generate_maze(DIFFICULTY)
+    virtual_maze = VirtualMaze(maze_raw)
     found_exit = False
     steps_taken = 0
     final_path = []
     started = False
     solve_time = 0
     search_finished = False
-    draw_maze(win, maze, exit_cell, steps_taken)
+    draw_maze(win, maze_raw, exit_cell, steps_taken)
     draw_buttons(win)
     update_info_panel()
 
 
 def regenerate_maze():
-    global maze
-    maze = generate_maze(DIFFICULTY)
     reset()
 
 
@@ -181,7 +198,7 @@ def main():
                     DIFFICULTY = 0.5
                     regenerate_maze()
                 elif not started and (0 <= row < ROWS and 0 <= col < COLS):
-                    if maze[row][col] == 1:
+                    if maze_raw[row][col] == 1:
                         start_cell = (row, col)
                         started = True
                         start_time = time.time()
